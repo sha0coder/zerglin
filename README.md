@@ -23,7 +23,9 @@ Executed in  248.52 millis    fish           external
 ```
 
 ## Usage
-perl zerglin.pl dataset.csv 2>/dev/null
+perl zerglin.pl dataset_sum.csv 2>/dev/null
+perl zerglin.pl dataset_xor.csv 2>/dev/null
 
 ## TODO
-- For now it gets 2 inputs and 1 output, adaptive architecture.
+- for now it gets 2 inputs and 1 output, adaptive architecture.
+- optimize resulting code, removing unnecessary parts.
