@@ -1,7 +1,7 @@
 # Zerglin GA
 
 
-This PoC geneates perl code that sovle a dataset, generaging the proper output for thegibven inputs.
+This PoC geneates perl code that sovle a dataset, generaging the proper output for the gibven inputs.
 So act like a neural network, but instead generating a model generates a working perl code.
 
 
