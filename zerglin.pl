@@ -341,7 +341,7 @@ sub optimize {
 sub main {
     my @population = create_random_population();
     my @sorted_popu = ();
-    
+
     foreach $gen (1..$max_generations) {
 
         @sorted_popu = evaluate_population(@population);
@@ -355,6 +355,7 @@ sub main {
 
         @topten = get_topten(@sorted_popu);
         @new_generation = do_crossover(@topten);
+        push(@new_generation, $topten[0][1]);
 
         foreach ($#new_generation..$population_size-6) {
             $i = int(rand($#sorted_popu));
@@ -370,13 +371,13 @@ sub main {
 
         #@population = shuffle(@new_generation);
         @population = @new_generation;
-        $max_score = $topten[0][0];
+        $min_err = $topten[0][0];
         print("\n");
-        print("** Generation $gen  population size $#population error $max_score\n");
+        print("** Generation $gen  population size $#population error $min_err\n");
         print($sorted_popu[0][0]." ".$sorted_popu[0][1]."\n");
         print(parse_genome($sorted_popu[0][1])."\n");
         #<>;
-        last if ($max_score == 0);
+        last if ($min_err == 0);
     }
 
     $optimized = optimize($sorted_popu[0][1]);
