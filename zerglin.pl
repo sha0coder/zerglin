@@ -1,0 +1,347 @@
+use List::Util qw(shuffle);
+use Data::Dumper;
+use POSIX;
+
+
+@dataset = load_dataset($ARGV[0]);
+$max_generations = 1000000;
+$population_size = 100;
+$mutation = 20; # 1 very 10 gens
+$debug_crossover = 0;
+$debug_population = 0;
+$debug_validation = 0;
+
+%gram = (
+    'A' => [
+        '+',
+        '-',
+        '*',
+        '/',
+        '%',
+        '^',
+        '**',
+    ],
+
+    'B' => [
+        '=',
+        '+=',
+        '-=',
+        '*=',
+        '/=',
+        '**=',
+        '%=',
+    ],
+
+    'C' => [
+        '==',
+        '<',
+        '>',
+        '<=',
+        '>=',
+    ],
+
+    'D' => [split(//,'0123456789')],
+    'E' => [map {'$'.$_} split(//,'abcdefghij')],
+);
+
+
+@gram_combos = (
+    ["E","B","D"], # $a += 1
+    ["E","B","E"], # $a += b
+    ["E","B","E","A","E"] # $a = $b + $c
+);
+
+sub load_dataset {
+    my ($dataset) = @_;
+    my @data=();
+
+    open(IN, $dataset);
+    foreach $l (<IN>) {
+        chop($l);
+        @fields = split(/,/, $l);
+        push(@data, [@fields]);
+    }
+    close(IN);
+    return @data;
+}
+
+
+sub parse_genome {
+    my @genomes = split(/-/, shift);
+    my $code = '';
+
+    foreach $genome (@genomes) {
+        my @gens = split(/,/, $genome);
+
+        foreach $gen (@gens) {
+            my @g = split(//, $gen); 
+            if ($g[0] eq 'F') {
+                $code .= ' if('.$gram{'E'}->[int($g[1])].$gram{'C'}->[int($g[2])].$gram{'E'}->[int($g[3])].')';
+            } else {
+                $code .= $gram{$g[0]}->[int($g[1])];
+            }
+        }
+        $code .= ';';
+    }
+
+    return $code;
+}
+
+# deprecated
+sub create_random_gen {
+    my @pos = ('A'..'E');
+    my $g = @pos[rand(@pos)];
+    my $l = scalar(@{$gram{$g}});
+    my $n = int(rand($l));
+    return "$g$n";
+}
+
+sub create_random_if {
+    my $g = 'F';
+    my $a = scalar(@{$gram{'C'}});
+    my $b = scalar(@{$gram{'E'}});
+    my $n1=int(rand($a));
+    my $n2=int(rand($b));
+    my $n3=int(rand($a));
+    return "F$n1$n2$n3";
+}
+
+sub create_random_genome {
+    my $genome = '';
+    my ($a,$b,$c,$d,$e);
+    
+    @combo = @{$gram_combos[int(rand(@gram_combos))]};
+    foreach $c (@combo) {
+        $genome.=$c.int(rand(@{$gram{$c}}));
+        $genome.=',';
+    }
+    chop($genome);
+
+    if (int(rand(15))==1) {
+        $genome.= ",".create_random_if();
+    }
+
+    return $genome;
+}
+
+sub create_random_genomes {
+    my $genome = '';
+    my $n = int(rand(8))+2;
+    foreach (0..$n) {
+        $genome.= create_random_genome()."-";
+    }
+    chop $genome;
+    return $genome;
+}
+
+sub create_random_population {
+    @population = ();
+    foreach (0..$population_size) {
+        push(@population, create_random_genomes());
+    }
+    return @population;
+}
+
+sub print_population {
+    my @population = @_;
+    foreach $ind (@population) {
+        $code = parse_genome($ind);
+        print "$ind $code\n"; 
+    }
+}
+
+sub evaluate_population {
+    my @population = @_;
+    my @scored_popu = ();
+    my ($a,$b, $err);
+
+    foreach $i_index (0..$#population) {
+        $err = 0;
+        foreach my $j_index (0..$#dataset) {
+            $a=$dataset[$j_index][0];
+            $b=$dataset[$j_index][1];
+            $expected_output=$dataset[$j_index][2];
+            last if ($expected_output == "");
+
+            $code = parse_genome($population[$i_index]);
+            $code =~ s/<>//g;
+            eval($code);
+            if ($@) {
+                $err += 100_000;
+            } else {
+                if (not $a==$a || !$a) {
+                    $err += 10_000;
+                } else {
+                    $err += abs($expected_output-int($a));
+                    #print(parse_genome($population[$i_index])."  $expected_output - $a   inputs: ".$dataset[$j_index][0]." ".$dataset[$j_index][1]."\n") if ($err==5);
+                }
+            }
+        }
+        push(@scored_popu, [$err, $population[$i_index]]) if ($population[$i_index]);
+    }
+
+    foreach $i (0..$#scored_popu-1) {
+        foreach $j ($i+1..$#scored_popu) {
+            if ($scored_popu[$i][0] > $scored_popu[$j][0]) {
+                $tmps = $scored_popu[$i][0];
+                $tmpv = $scored_popu[$i][1];
+                $scored_popu[$i][0] = $scored_popu[$j][0];
+                $scored_popu[$i][1] = $scored_popu[$j][1];
+                $scored_popu[$j][0] = $tmps;
+                $scored_popu[$j][1] = $tmpv; 
+            }
+        }
+    }
+
+
+    return @scored_popu;
+}
+
+sub get_topten {
+    my @sorted_popu = @_;
+    my @topten = ();
+    foreach $i (0..9) {
+        push(@topten, $sorted_popu[$i]);
+    }
+    return @topten;
+}
+
+sub do_crossover_raw {
+    my @topten = @_;
+    my @new_generation = ();
+
+    foreach $i (0..9) {
+        $j=$i;
+        while ($i == $j) {
+            $j=int(rand(10));
+        }
+        $father = $topten[$i][1];
+        $mother = $topten[$j][1];
+        $middle_father = int(length($father)/2);
+        $middle_mother = int(length($mother)/2);
+
+        $child1 = substr($father,0,$middle_father).substr($mother,$middle_mother,length($mother)-$middle_mother);
+        $child2 = substr($mother,0,$middle_mother).substr($father,$middle_father,length($father)-$middle_father);
+        print("father: $father  mother: $mother\n  child1: $child1 child2: $child2\n") if ($debug_crossover);
+        push(@new_generation, $child1);
+        push(@new_generation, $child2);
+    }
+
+    return @new_generation;
+}
+
+sub do_crossover {
+    my @topten = @_;
+    my @new_generation = ();
+
+    foreach $i (0..5) {
+        $j=$i;
+        while ($i == $j) {
+            $j=int(rand(5)+5);
+        }
+        @father = split(/-/, $topten[$i][1]);
+        @mother = split(/-/, $topten[$j][1]);
+        $child1 = '';
+        $child2 = '';
+        $child3 = '';
+        $child4 = '';
+        foreach $i (0..$#father) {
+            if ($i % 2 == 0) {
+                $child1 .= $father[$i];
+                $child2 .= $mother[$i] if (i<=$#mother);
+            } else {
+                $child1 .= $mother[$i] if (i<=$#mother);
+                $child2 .= $father[$i];
+            }
+            if ($i % 4 == 0) {
+                $child3 .= $father[$i];
+                $child4 .= $mother[$i] if (i<=$#mother);
+            } else {
+                $child3 .= $mother[$i] if (i<=$#mother);
+                $child4 .= $father[$i];
+            }
+
+            $child1.= "-";
+            $child2.= "-";
+            $child3.= "-";
+            $child4.= "-";
+        }
+        chop($child1);
+        chop($child2);
+        chop($child3);
+        chop($child4);
+
+        push(@new_generation, mutate_individual($child1));
+        push(@new_generation, mutate_individual($child2));
+        push(@new_generation, mutate_individual($child3));
+        push(@new_generation, mutate_individual($child4));
+    }
+
+    return @new_generation;
+}
+
+sub mutate_individual {
+    my $individual = shift;
+    my $mutated = '';
+
+    @genotypes = split(/-/, $individual);
+    foreach $genotype (@genotypes) {
+        @gens = split(/,/, $genotype);
+        foreach $gen (@gens) {
+            if (int(rand($mutation)) == 1) {
+                $l = substr($gen,0,1);
+                $mutated.=$l.int(rand(@{$gram{$l}}));
+            } else {
+                $mutated .= $gen;
+            }
+            $mutated.=",";
+        }
+        chop($mutated);
+        $mutated.="-";
+    }
+    chop($mutated);
+
+    return $mutated;
+}
+
+sub main {
+    my @population = create_random_population();
+    
+    foreach $gen (1..$max_generations) {
+
+        my @sorted_popu = evaluate_population(@population);
+
+        if ($debug_population) {
+            foreach $i (0..$#sorted_popu) {
+                print($sorted_popu[$i][0]." ".$sorted_popu[$i][1]."  ".
+                    parse_genome($sorted_popu[$i][1])."\n");
+            }
+        }
+
+        @topten = get_topten(@sorted_popu);
+        @new_generation = do_crossover(@topten);
+
+        foreach ($#new_generation..$population_size-6) {
+            $i = int(rand($#sorted_popu));
+            $diversity = $sorted_popu[$i][1];
+            push(@new_generation, $diversity);
+        }
+
+        push(@new_generation, $sorted_popu[0][1]);
+        push(@new_generation, mutate_individual($sorted_popu[0][1]));
+        push(@new_generation, create_random_genome());
+        push(@new_generation, create_random_genome());
+        push(@new_generation, create_random_genome());
+
+        @population = shuffle(@new_generation);
+        $max_score = $topten[0][0];
+        print("\n");
+        print("** Generation $gen  population size $#population error $max_score\n");
+        print($sorted_popu[0][1]."\n");
+        print(parse_genome($sorted_popu[0][1])."\n");
+        #<>;
+        last if ($max_score == 0);
+    }
+}
+
+main();
