@@ -313,12 +313,38 @@ sub mutate_individual {
     return $mutated;
 }
 
+sub optimize {
+    my ($genotype) = @_;
+    my $optimized = '';
+
+    my @blocks = split /-/, $genotype;
+    my @combo = ([shift @blocks]);
+    foreach my $bloque (@blocks) {
+        my @new_combo = ();
+        foreach my $comb (@combo) {
+            push @new_combo, [@{$comb}, $bloque];
+        }
+        push @combo, [$bloque], @new_combo;
+    }
+
+    @combo = sort { scalar(@$a) <=> scalar(@$b) } @combo;
+
+    foreach my $comb (@combo) {
+        my $genot = join "-", @$comb;
+        $err = evaluate_individual($genot);
+        return $genot if ($err == 0);
+    }
+
+    return $genotype;
+}
+
 sub main {
     my @population = create_random_population();
+    my @sorted_popu = ();
     
     foreach $gen (1..$max_generations) {
 
-        my @sorted_popu = evaluate_population(@population);
+        @sorted_popu = evaluate_population(@population);
 
         if ($debug_population) {
             foreach $i (0..$#sorted_popu) {
@@ -352,6 +378,10 @@ sub main {
         #<>;
         last if ($max_score == 0);
     }
+
+    $optimized = optimize($sorted_popu[0][1]);
+    print("\nOptimized result:\n");
+    print("$optimized\n".parse_genome($optimized)."\n");
 }
 
 main();

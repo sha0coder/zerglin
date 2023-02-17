@@ -28,4 +28,3 @@ perl zerglin.pl dataset_xor.csv 2>/dev/null
 
 ## TODO
 - for now it gets 2 inputs and 1 output, adaptive architecture.
-- optimize resulting code, removing unnecessary parts.
