@@ -7,6 +7,7 @@ So act like a neural network, but instead generating a model generates a working
 
 ## Usage
 perl zerglin.pl dataset_sum.csv 2>/dev/null
+
 perl zerglin.pl dataset_xor.csv 2>/dev/null
 
 ## TODO
