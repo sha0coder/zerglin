@@ -30,6 +30,7 @@ $debug_validation = 0;
         '/=',
         '**=',
         '%=',
+        '^=',
     ],
 
     'C' => [
@@ -150,33 +151,42 @@ sub print_population {
     }
 }
 
+sub evaluate_individual {
+    my ($genome) = @_;
+    my $err = 0;
+
+    foreach my $j_index (0..$#dataset) {
+        my $a=$dataset[$j_index][0];
+        my $b=$dataset[$j_index][1];
+        my $expected_output=$dataset[$j_index][2];
+        if ($expected_output eq "") {
+            last;
+        }
+
+        $code = parse_genome($genome);
+        $code =~ s/<>//g;
+        eval($code);
+        if ($@) {
+            $err += 100_000;
+        } else {
+            if (not $a==$a || !$a) {
+                $err += 10_000;
+            } else {
+                $err += abs($expected_output-int($a));
+            }
+        }
+    }
+
+    return $err;
+}
+
 sub evaluate_population {
     my @population = @_;
     my @scored_popu = ();
-    my ($a,$b, $err);
+    my ($a,$b);
 
     foreach $i_index (0..$#population) {
-        $err = 0;
-        foreach my $j_index (0..$#dataset) {
-            $a=$dataset[$j_index][0];
-            $b=$dataset[$j_index][1];
-            $expected_output=$dataset[$j_index][2];
-            last if ($expected_output == "");
-
-            $code = parse_genome($population[$i_index]);
-            $code =~ s/<>//g;
-            eval($code);
-            if ($@) {
-                $err += 100_000;
-            } else {
-                if (not $a==$a || !$a) {
-                    $err += 10_000;
-                } else {
-                    $err += abs($expected_output-int($a));
-                    #print(parse_genome($population[$i_index])."  $expected_output - $a   inputs: ".$dataset[$j_index][0]." ".$dataset[$j_index][1]."\n") if ($err==5);
-                }
-            }
-        }
+        my $err = evaluate_individual($population[$i_index]);
         push(@scored_popu, [$err, $population[$i_index]]) if ($population[$i_index]);
     }
 
@@ -192,7 +202,6 @@ sub evaluate_population {
             }
         }
     }
-
 
     return @scored_popu;
 }
@@ -333,11 +342,12 @@ sub main {
         push(@new_generation, create_random_genome());
         push(@new_generation, create_random_genome());
 
-        @population = shuffle(@new_generation);
+        #@population = shuffle(@new_generation);
+        @population = @new_generation;
         $max_score = $topten[0][0];
         print("\n");
         print("** Generation $gen  population size $#population error $max_score\n");
-        print($sorted_popu[0][1]."\n");
+        print($sorted_popu[0][0]." ".$sorted_popu[0][1]."\n");
         print(parse_genome($sorted_popu[0][1])."\n");
         #<>;
         last if ($max_score == 0);
