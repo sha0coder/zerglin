@@ -1,4 +1,4 @@
-# Zerglin GA
+# Zergling GA
 
 
 This PoC geneates perl code that sovle a dataset, generaging the proper output for the given inputs.
@@ -6,9 +6,9 @@ So act like a neural network, but instead generating a model generates a working
 
 
 ## Usage
-perl zerglin.pl dataset_sum.csv 2>/dev/null
+perl zergling.pl dataset_sum.csv 2>/dev/null
 
-perl zerglin.pl dataset_xor.csv 2>/dev/null
+perl zergling.pl dataset_xor.csv 2>/dev/null
 
 ## TODO
 - for now it gets 2 inputs and 1 output, adaptive architecture.
@@ -67,3 +67,6 @@ E0,B0,E0,A2,E1
 $a=$a*$b;
 
 ```
+
+
+

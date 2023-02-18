@@ -6,7 +6,9 @@ use POSIX;
 @dataset = load_dataset($ARGV[0]);
 $max_generations = 1000000;
 $population_size = 100;
-$mutation = 20; # 1 very 10 gens
+$mutation_prob = 20; # 1 very 20 gens
+$extension_prob = 100;
+$compression_prob = 200;
 $debug_crossover = 0;
 $debug_population = 0;
 $debug_validation = 0;
@@ -88,7 +90,7 @@ sub parse_genome {
     return $code;
 }
 
-# deprecated
+
 sub create_random_gen {
     my @pos = ('A'..'E');
     my $g = @pos[rand(@pos)];
@@ -215,6 +217,7 @@ sub get_topten {
     return @topten;
 }
 
+# deprecated
 sub do_crossover_raw {
     my @topten = @_;
     my @new_generation = ();
@@ -293,22 +296,33 @@ sub mutate_individual {
     my $individual = shift;
     my $mutated = '';
 
+    #TODO: add the posibility not very likely to add and remove chunks.
+
     @genotypes = split(/-/, $individual);
     foreach $genotype (@genotypes) {
         @gens = split(/,/, $genotype);
         foreach $gen (@gens) {
-            if (int(rand($mutation)) == 1) {
+            if (int(rand($mutation_prob)) == 1) {
                 $l = substr($gen,0,1);
                 $mutated.=$l.int(rand(@{$gram{$l}}));
             } else {
-                $mutated .= $gen;
+                $mutated.=$gen;
             }
             $mutated.=",";
         }
         chop($mutated);
         $mutated.="-";
+        last if (int(rand($compression_prob)) == 0);
     }
     chop($mutated);
+
+    if (int(rand($extension_prob)) == 0) {
+        if (int(rand(2)) == 1) {
+            $mutated.= '-'.create_random_gen();   
+        } else {
+            $mutated.= '-'.create_random_if();
+        }
+    }
 
     return $mutated;
 }
@@ -386,3 +400,5 @@ sub main {
 }
 
 main();
+
+
